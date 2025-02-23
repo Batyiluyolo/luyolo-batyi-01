@@ -1,47 +1,50 @@
-use burn::{
-    module::Module,
-    nn::{Linear, LinearConfig},
-    tensor::{backend::Backend, Tensor},
-};
+mod data;
+mod model;
+mod trainings;
 
-#[derive(Module, Debug, Clone)] // Added Clone trait
-struct Model<B: Backend> {
-    weight: Linear<B>,
-}
-
-impl<B: Backend> Model<B> {
-    fn new(device: &B::Device) -> Self {
-        Self {
-            weight: LinearConfig::new(1, 1).init(device), // Passed the device argument
-        }
-    }
-
-    fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
-        self.weight.forward(input)
-    }
-}
-
-fn mean_squared_error<B: Backend>(
-    predictions: Tensor<B, 2>,
-    targets: Tensor<B, 2>
-) -> Tensor<B, 2> {
-    (predictions - targets).powf(2.0).mean()
-}
+use data::Dataset;
+use textplots::{Chart, Plot, Shape};  // Added Plot back
 
 fn main() {
-    let device = burn::tensor::backend::Default::default(); // Initialize the device
-    let model = Model::new(&device);
+    println!("\n=== Statistical Analysis Program ===\n");
 
-    let x_values = [0.1, 0.2, 0.3, 0.4];
-    let y_values = [0.2, 0.4, 0.6, 0.8];
+    // Initialize dataset
+    let dataset = Dataset::new();
 
-    for (x, y) in x_values.iter().zip(y_values.iter()) {
-        let x_tensor = Tensor::<burn::tensor::backend::Default, 2>::from_floats(&[[*x]], &device);
-        let y_tensor = Tensor::<burn::tensor::backend::Default, 2>::from_floats(&[[*y]], &device);
-
-        let prediction = model.forward(x_tensor);
-        let loss = mean_squared_error(prediction, y_tensor);
-
-        println!("Loss: {:?}", loss);
+    // Display data points
+    println!("\nData Points:");
+    for i in 0..dataset.len() {
+        println!("Entry {}: input = {:.2}, output = {:.2}",
+                 i + 1,
+                 dataset.input_values[i],
+                 dataset.output_values[i]);
     }
+
+    // Calculate statistical measures
+    let (input_mean, output_mean) = dataset.calculate_means();
+    println!("\nStatistical Measures:");
+    println!("Input Average: {:.3}", input_mean);
+    println!("Output Average: {:.3}", output_mean);
+
+    // Calculate regression parameters
+    let n = dataset.len() as f64;
+    let sum_input: f64 = dataset.input_values.iter().sum();
+    let sum_output: f64 = dataset.output_values.iter().sum();
+    let sum_products: f64 = dataset.input_values.iter()
+        .zip(dataset.output_values.iter())
+        .map(|(x, y)| x * y)
+        .sum();
+    let sum_squares: f64 = dataset.input_values.iter()
+        .map(|x| x * x)
+        .sum();
+
+    let gradient = (n * sum_products - sum_input * sum_output)
+        / (n * sum_squares - sum_input * sum_input);
+    let intercept = (sum_output - gradient * sum_input) / n;
+
+    println!("\nRegression Analysis:");
+    println!("Mathematical Model: output = {:.3} × input + {:.3}", gradient, intercept);
+    println!("Expected Model: output = 3.000 × input - 2.000");
+
+    println!("\n=== Analysis Complete ===\n");
 }
